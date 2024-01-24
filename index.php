@@ -36,8 +36,7 @@ $configuration->cache = NullCache::class;
 // Prepare an authentication container for ESI
 $authentication = new EsiAuthentication([
     'client_id'     => 'f25a4f7514244e66bedbdb2313c18c14',
-    'secret'        => '7s0Vf1jfceCM5PjFS0jz1aVPXH0CtOrhtvFbTDZb',
-    'refresh_token' => 'CHARACTER_REFRESH_TOKEN',
+    'secret'        => '7s0Vf1jfceCM5PjFS0jz1aVPXH0CtOrhtvFbTDZb'
 ]);
 
 // Instantiate a new ESI instance.
