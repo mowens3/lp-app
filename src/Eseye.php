@@ -224,6 +224,7 @@ class Eseye
     public function invoke(string $method, string $uri, array $uri_data = []): EsiResponse
     {
 
+
         // Check the Access Requirement
         if (! $this->getAccessChecker()->can(
             $method, $uri, $this->getFetcher()->getAuthenticationScopes())
@@ -232,13 +233,14 @@ class Eseye
             // Build the uri so that there is context around what is denied.
             $uri = $this->buildDataUri($uri, $uri_data);
 
+
+
             // Log the deny.
             $this->logger->warning('Access denied to ' . $uri . ' due to ' .
                 'missing scopes.');
 
             throw new EsiScopeAccessDeniedException('Access denied to ' . $uri);
         }
-
         // Build the URI from the parts we have.
         $uri = $this->buildDataUri($uri, $uri_data);
 
@@ -246,6 +248,7 @@ class Eseye
         if (in_array(strtolower($method), $this->cachable_verb) &&
             $cached = $this->getCache()->get($uri->getPath(), $uri->getQuery())
         ) {
+        
 
             // In case the cached entry is still valid, mark content as being loaded from cache.
             if (! $cached->expired())
@@ -299,6 +302,7 @@ class Eseye
         // self cleanups of this objects request data such as
         // query string parameters and post bodies.
         $this->cleanupRequestData();
+
 
         return $result;
     }
@@ -362,12 +366,19 @@ class Eseye
             'datasource' => $this->getConfiguration()->datasource,
         ], $this->getQueryString());
 
+
+        $special_path = array('/verify');
+
+        if(!in_array($uri, $special_path)){
+            $path = rtrim($this->getVersion(), '/') . $this->mapDataToUri($uri, $data);
+        }else{
+            $path = $this->mapDataToUri($uri, $data);
+        }
         return Uri::fromParts([
             'scheme' => $this->getConfiguration()->esi_scheme,
             'host'   => $this->getConfiguration()->esi_host,
             'port'   => $this->getConfiguration()->esi_port,
-            'path'   => rtrim($this->getVersion(), '/') .
-                $this->mapDataToUri($uri, $data),
+            'path'   => $path,
             'query'  => http_build_query($query_params),
         ]);
     }

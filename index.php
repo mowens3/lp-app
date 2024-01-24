@@ -148,8 +148,13 @@ switch ($_GET['action']) {
 
         $esi = new \Seat\Eseye\Eseye($authentication);
 
+
+        $meta_info = $esi->invoke('get', '/verify');
+        $meta_array = json_decode($meta_info->raw, true);
+
+
         $loyalty_info = $esi->invoke('get', '/characters/{character_id}/notifications/', [
-            'character_id' => 2117819851,
+            'character_id' => $meta_array['CharacterID'],
         ]);
 
 
