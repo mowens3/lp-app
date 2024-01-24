@@ -389,10 +389,14 @@ class GuzzleFetcher implements FetcherInterface
         // If there are no scopes that we know of, update them.
         // There will always be at least 1 as we add the internal
         // 'public' scope.
-        if (count($this->getAuthentication()->scopes) <= 0)
+        //print_r($this->getAuthenticationScopes());
+        $scope_array = $this->getAuthentication()->scope;
+        if (!$scope_array)
             $this->setAuthenticationScopes();
 
-        return $this->getAuthentication()->scopes;
+            $this_authentication = $this->getAuthentication();
+
+            return [$this_authentication['scopes']];
     }
 
     /**
@@ -405,8 +409,9 @@ class GuzzleFetcher implements FetcherInterface
      */
     public function setAuthenticationScopes()
     {
+        $this_auth = $this->getAuthentication();
 
-        $jws_token = $this->verifyToken($this->authentication->access_token);
+        $jws_token = $this->verifyToken($this_auth->access_token);
 
         $this->authentication->scopes = $jws_token['scp'];
     }

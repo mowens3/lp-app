@@ -33,41 +33,251 @@ use Seat\Eseye\Eseye;
 $configuration = Configuration::getInstance();
 $configuration->cache = NullCache::class;
 
-// Prepare an authentication container for ESI
-$authentication = new EsiAuthentication([
-    'client_id'     => 'f25a4f7514244e66bedbdb2313c18c14',
-    'secret'        => '7s0Vf1jfceCM5PjFS0jz1aVPXH0CtOrhtvFbTDZb'
-]);
 
-// Instantiate a new ESI instance.
-$esi = new Eseye($authentication);
+/**
+ * @return string
+ */
+function get_sso_callback_url()
+{
 
-// Get character information. This is a public call to the EVE
-// Swagger Interface
-$character_info = $esi->invoke('get', '/characters/{character_id}/', [
-    'character_id' => 1477919642,
-]);
+    if (! empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        $protocol = 'https://';
+    else
+        $protocol = 'http://';
 
-// Get the location information for a character. This is an authenticated
-// call to the EVE Swagger Interface.
-$location = $esi->invoke('get', '/characters/{character_id}/location/', [
-    'character_id' => 1477919642,
-]);
-
-$clones = $esi->invoke('get', '/characters/{character_id}/clones/', [
-    'character_id' => 1477919642,
-]);
-
-// Print some information from the calls we have made.
-echo 'Character Name is:        ' . $character_info->name . PHP_EOL;
-echo 'Character was born:       ' . carbon($character_info->birthday)
-        ->diffForHumans() . PHP_EOL;    // The 'carbon' helper is included in the package.
-echo 'Home Solar System ID is:  ' . $location->solar_system_id . PHP_EOL;
-echo 'Home Station ID is:       ' . $location->station_id . PHP_EOL;
-
-echo 'You have the following clones: ' . PHP_EOL;
-foreach ($clones->jump_clones as $jump_clone) {
-
-    echo 'Clone at a ' . $jump_clone->location_type .
-        ' with ' . count($jump_clone->implants) . ' implants' . PHP_EOL;
+    return $protocol . $_SERVER['HTTP_HOST'] . $_SERVER['PHP_SELF'] . '?action=eveonlinecallback';
 }
+
+
+$_SESSION['clientid'] = getenv('clientid');
+$_SESSION['secret'] = getenv('secret');
+$_SESSION['state'] = uniqid();
+
+// Generate the url with the requested scopes
+$url = 'https://login.eveonline.com/v2/oauth/authorize/?response_type=code&redirect_uri=' .
+    urlencode(get_sso_callback_url()) . '&client_id=' .
+    $_SESSION['clientid'] . '&scope=esi-characters.read_notifications.v1&state='.$_SESSION['state'];
+
+$login_url = '<a href="'.$url.'">Generate LP Report</a>';
+
+
+
+switch ($_GET['action']) {
+
+    // Display the form to create a new login.
+    case 'new':
+        print_r($login_url);
+        break;
+
+    case 'eveonlinecallback':
+        // Verify the state.
+
+
+        if ($_GET['state'] != $_REQUEST['state']) {
+
+            echo 'Invalid State! You will have to start again!<br>';
+            echo '<a href="' . $_SERVER['PHP_SELF'] . '?action=new">Start again</a>';
+            exit;
+        }
+
+
+        
+        // Clear the state value.
+        $_SESSION['state'] = null;
+
+        // Prep the authentication header.
+        $headers = [
+            'Authorization: Basic ' . base64_encode($_SESSION['clientid'] . ':' . $_SESSION['secret']),
+            'Content-Type: application/x-www-form-urlencoded',
+            'Host:login.eveonline.com'
+        ];
+
+        $url='https://login.eveonline.com/v2/oauth/token';
+
+
+        $fields_string='';
+        $fields=array(
+                    'grant_type' => 'authorization_code',
+                    'code' => $_GET['code'],
+                 //   'code_verifier' => 'codeverifier'
+                );
+        foreach ($fields as $key => $value) {
+            $fields_string .= $key.'='.$value.'&';
+        }
+        $fields_string = rtrim($fields_string, '&');
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        ///curl_setopt($ch, CURLOPT_USERAGENT, $useragent);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_POST, count($fields));
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $fields_string);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+        $result = curl_exec($ch);
+
+        $data = json_decode($result);
+
+        
+        $client_id = $_SESSION['clientid'];
+        $secret_key = $_SESSION['secret'];
+
+        if(isset($data->refresh_token)){
+            $_SESSION['refresh_token'] = $data->refresh_token;
+        }else{
+            break;
+        }
+
+        if(isset($data->access_token)){
+            $_SESSION['access_token'] = $data->access_token;
+        }else{
+            break;
+        }
+
+
+
+
+        $authentication = new \Seat\Eseye\Containers\EsiAuthentication([
+            'client_id'     => $client_id,
+            'secret'        => $secret_key,
+            'access_token' => $_SESSION['access_token'],
+            'refresh_token' => $_SESSION['refresh_token'],
+        ]);
+        ///Great. We instantiate a new Eseye instance with the authentication information as argument:
+
+        $esi = new \Seat\Eseye\Eseye($authentication);
+
+        $loyalty_info = $esi->invoke('get', '/characters/{character_id}/notifications/', [
+            'character_id' => 2117819851,
+        ]);
+
+
+
+        foreach($loyalty_info as $key=>$value){
+            if($value->type == "FacWarLPPayoutEvent"){
+                $first_line = preg_split('#\r?\n#', $value->text, 2)[0];
+                $amount = (int)preg_replace('/[^0-9]/', '', $first_line);
+                $date = strtotime($value->timestamp); 
+                $array_day_date = date('d-M-Y', $date);
+                $array_month_date = date('M-Y', $date);
+                $this_list[] = ['y'=> $amount, 'label'=> $array_day_date];
+                $this_day_list[$array_day_date] += $amount;
+                $this_month_list[$array_month_date] += $amount;
+            }
+        }
+
+
+        foreach($this_day_list as $key=>$value){
+            $total_day_list[] = array('date'=>$key, 'total'=>$value);
+        }
+
+
+        foreach($this_month_list as $key=>$value){
+            $total_month_list[] = array('date'=>$key, 'total'=>$value);
+        }
+
+
+        // Comparison function 
+        function date_compare($element1, $element2) { 
+            $datetime1 = strtotime($element1['date']); 
+            $datetime2 = strtotime($element2['date']); 
+            return $datetime1 - $datetime2; 
+        }  
+        
+        // Sort the array  
+        usort($total_day_list, 'date_compare'); 
+        usort($total_month_list, 'date_compare'); 
+
+
+        foreach($total_day_list as $key=>$value){
+            $chart_list[] = ['y'=>$value['total'], 'label'=>$value['date']];
+        }
+
+
+        $isk_per_lp = '2000';
+        break;
+    default:
+        break;
+
+}
+
+?>
+
+
+<!DOCTYPE HTML>
+<html>
+<head>
+<?php if ($_SESSION['access_token']){ ?>
+
+<script>
+window.onload = function () {
+ 
+var chart = new CanvasJS.Chart("chartContainer", {
+	title: {
+		text: "LP FW Participation"
+	},
+	axisY: {
+		title: "LP total"
+	},
+	data: [{
+		type: "line",
+		dataPoints: <?php echo json_encode($chart_list, JSON_NUMERIC_CHECK); ?>
+	}]
+});
+chart.render();
+ 
+}
+<?php } ?>
+
+</script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+</head>
+<body>
+<h1 class="text-danger">Cherry LP Tool</h1>
+<p> Please screenshot this table and send to corp </p>
+<?php if ($_SESSION['access_token']){ ?>
+
+<div id="table">
+<table class="table">
+<h2>Daily Totals</h2>
+<thead>
+    <tr>
+      <th scope="col">Date</th>
+      <th scope="col">Total</th>
+    </tr>
+  </thead>
+  <tbody>
+        <?php foreach ($total_day_list as $row) : ?>
+        <tr>
+            <td><?php echo $row['date']; ?></td>
+            <td><?php echo number_format($row['total']). ' x '.$isk_per_lp.' ISK = '.number_format($row['total']*$isk_per_lp).' ISK'; ?></td>
+        </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+</div>
+<div id="table2">
+<h2>Monthly Totals</h2>
+<table class="table">
+<thead>
+    <tr>
+      <th scope="col">Date</th>
+      <th scope="col">Total</th>
+    </tr>
+  </thead>
+        <?php foreach ($total_month_list as $row) : ?>
+        <tr>
+            <td><?php echo $row['date']; ?></td>
+            <td><?php echo number_format($row['total']). ' x '.$isk_per_lp.' ISK = '.number_format($row['total']*$isk_per_lp). ' ISK'; ?></td>
+        </tr>
+        <?php endforeach; ?>
+    </table>
+</div>
+<div id="chartContainer" style="height: 370px; width: 100%;"></div>
+<?php } ?>
+
+<script src="https://cdn.canvasjs.com/canvasjs.min.js"></script>
+<?php echo $login_url ?>
+</body>
+</html>  
