@@ -40,7 +40,7 @@ $configuration->cache = NullCache::class;
 function get_sso_callback_url()
 {
 
-    if (! empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+    if (getenv('SSL') == 'on')
         $protocol = 'https://';
     else
         $protocol = 'http://';
