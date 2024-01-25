@@ -183,6 +183,7 @@ switch ($_GET['action']) {
         }
 
 
+
         // Comparison function 
         function date_compare($element1, $element2) { 
             $datetime1 = strtotime($element1['date']); 
@@ -191,8 +192,13 @@ switch ($_GET['action']) {
         }  
         
         // Sort the array  
-        usort($total_day_list, 'date_compare'); 
-        usort($total_month_list, 'date_compare'); 
+        if(isset($total_day_list)){
+            usort($total_day_list, 'date_compare'); 
+        }
+
+        if(isset($total_month_list)){
+            usort($total_month_list, 'date_compare'); 
+        }
 
 
         foreach($total_day_list as $key=>$value){
