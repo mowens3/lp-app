@@ -165,7 +165,7 @@ switch ($_GET['action']) {
                 $amount = (int)preg_replace('/[^0-9]/', '', $first_line);
                 $date = strtotime($value->timestamp); 
                 $array_day_date = date('d-M-Y', $date);
-                $array_week_date = date('w-Y', $date);
+                $array_week_date = date('W-M-Y', $date);
                 $array_month_date = date('M-Y', $date);
                 $this_list[] = ['y'=> $amount, 'label'=> $array_day_date];
                 $this_week_list[$array_week_date] += $amount;
@@ -181,7 +181,6 @@ switch ($_GET['action']) {
         foreach($this_week_list as $key=>$value){
             $total_week_list[] = array('date'=>$key, 'total'=>$value);
         }
-
 
         foreach($this_month_list as $key=>$value){
             $total_month_list[] = array('date'=>$key, 'total'=>$value);
