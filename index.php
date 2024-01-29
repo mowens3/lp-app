@@ -165,8 +165,10 @@ switch ($_GET['action']) {
                 $amount = (int)preg_replace('/[^0-9]/', '', $first_line);
                 $date = strtotime($value->timestamp); 
                 $array_day_date = date('d-M-Y', $date);
+                $array_week_date = date('w-Y', $date);
                 $array_month_date = date('M-Y', $date);
                 $this_list[] = ['y'=> $amount, 'label'=> $array_day_date];
+                $this_week_list[$array_week_date] += $amount;
                 $this_day_list[$array_day_date] += $amount;
                 $this_month_list[$array_month_date] += $amount;
             }
@@ -175,6 +177,9 @@ switch ($_GET['action']) {
 
         foreach($this_day_list as $key=>$value){
             $total_day_list[] = array('date'=>$key, 'total'=>$value);
+        }
+        foreach($this_week_list as $key=>$value){
+            $total_week_list[] = array('date'=>$key, 'total'=>$value);
         }
 
 
@@ -196,10 +201,13 @@ switch ($_GET['action']) {
             usort($total_day_list, 'date_compare'); 
         }
 
+        if(isset($total_week_list)){
+            usort($total_week_list, 'date_compare'); 
+        }
+
         if(isset($total_month_list)){
             usort($total_month_list, 'date_compare'); 
         }
-
 
         foreach($total_day_list as $key=>$value){
             $chart_list[] = ['y'=>$value['total'], 'label'=>$value['date']];
@@ -268,6 +276,24 @@ chart.render();
         </tbody>
     </table>
 </div>
+<div id="tableweek">
+<h2>Weekly Totals</h2>
+<table class="table">
+<thead>
+    <tr>
+      <th scope="col">Date</th>
+      <th scope="col">Total</th>
+    </tr>
+  </thead>
+        <?php foreach ($total_week_list as $row) : ?>
+        <tr>
+            <td><?php echo $row['date']; ?></td>
+            <td><?php echo number_format($row['total']). ' x '.$isk_per_lp.' ISK = '.number_format($row['total']*$isk_per_lp). ' ISK'; ?></td>
+        </tr>
+        <?php endforeach; ?>
+    </table>
+</div>
+
 <div id="table2">
 <h2>Monthly Totals</h2>
 <table class="table">
